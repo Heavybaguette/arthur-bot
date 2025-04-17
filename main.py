@@ -1,41 +1,37 @@
-import os
 import discord
-from discord.ext import commands
-from openai import OpenAI
+import openai
+import os
 
 intents = discord.Intents.default()
-intents.messages = True
 intents.message_content = True
+intents.presences = False
+intents.members = False
 
-bot = commands.Bot(command_prefix="!", intents=intents)
+client = discord.Client(intents=intents)
 
-# Client OpenAI (version >= 1.0.0)
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+openai.api_key = os.getenv("OPENAI_API_KEY")
+DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 
-@bot.event
+@client.event
 async def on_ready():
-    print(f"{bot.user} est prêt à tirer plus vite que son ombre.")
+    print(f"{client.user} est prêt à tirer plus vite que son ombre.")
 
-@bot.event
+@client.event
 async def on_message(message):
-    if message.author == bot.user:
+    if message.author == client.user:
         return
 
-    if bot.user.mentioned_in(message):
+    if client.user in message.mentions or "arthur" in message.content.lower():
         try:
-            response = client.chat.completions.create(
+            response = openai.ChatCompletion.create(
                 model="gpt-3.5-turbo",
                 messages=[
-                    {"role": "system", "content": "Tu es Arthur Morgan. Réponds comme un cow-boy du Far West, avec du caractère, mais reste amical."},
+                    {"role": "system", "content": "Tu es Arthur Morgan, un cowboy bourru mais loyal, parlant avec un ton western."},
                     {"role": "user", "content": message.content}
                 ]
             )
-
-            reply = response.choices[0].message.content
-            await message.channel.send(reply)
-
+            await message.channel.send(response.choices[0].message.content)
         except Exception as e:
-            await message.channel.send("Hmm... laisse-moi réfléchir...\nJ'ai eu un problème pour répondre, cow-boy.")
-            print(f"Erreur OpenAI : {e}")
+            await message.channel.send(f"Erreur OpenAI : {str(e)}")
 
-bot.run(os.getenv("DISCORD_TOKEN"))
+client.run(DISCORD_TOKEN)
