@@ -44,6 +44,6 @@ async def on_message(message):
             reply = response["choices"][0]["message"]["content"]
             await message.channel.send(reply)
         except Exception as e:
-            await message.channel.send("J'ai eu un problème pour répondre, cow-boy.")
+            await message.channel.send(f"Erreur OpenAI : {str(e)}")
 
 client.run(os.getenv("DISCORD_TOKEN"))
