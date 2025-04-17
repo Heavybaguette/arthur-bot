@@ -1,18 +1,19 @@
-
 import os
 import discord
 from discord.ext import commands
-from discord import Intents
+from dotenv import load_dotenv
 from openai import OpenAI
 
-intents = Intents.default()
-intents.messages = True
-intents.message_content = True
+load_dotenv()
 
+DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+intents = discord.Intents.default()
+intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-import openai
-openai.api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 @bot.event
 async def on_ready():
@@ -20,21 +21,28 @@ async def on_ready():
 
 @bot.event
 async def on_message(message):
-    if message.author == bot.user:
+    if message.author.bot:
         return
 
-    if bot.user.mentioned_in(message) or "arthur" in message.content.lower():
+    content = message.content.lower()
+    if "arthur" in content or bot.user.mentioned_in(message):
         try:
-            response = openai.chat.completions.create(
+            response = client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
-                    {"role": "system", "content": "Tu es Arthur Morgan, un cow-boy au franc parler. Tu rÃ©ponds en franÃ§ais, de maniÃ¨re brute et directe, avec un ton RP."},
+                    {"role": "system", "content": (
+                        "Tu es Arthur Morgan, un cow-boy franc, brut, loyal. "
+                        "Tu parles toujours en franÃ§ais dans un style RP western sec et direct. "
+                        "Tu fais partie du serveur One Last Time, fondÃ© par Baguette. "
+                        "Pour rejoindre le serveur, on utilise F8 puis : connect 88.198.53.38:30075."
+                    )},
                     {"role": "user", "content": message.content}
                 ]
             )
-            await message.channel.send(response.choices[0].message.content)
+            reply = response.choices[0].message.content
+            await message.channel.send(reply)
         except Exception as e:
-            print("[ERREUR]", e)
+            print(f"[ERREUR] {e}")
             await message.channel.send("J'ai eu un souci pour rÃ©pondre, cow-boy.")
 
-bot.run(os.getenv("DISCORD_TOKEN"))
+bot.run(DISCORD_TOKEN)
