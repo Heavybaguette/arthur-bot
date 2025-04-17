@@ -1,58 +1,50 @@
 import discord
 import openai
 import os
-from sentence_transformers import SentenceTransformer, util
 
-# Clés d’API
-TOKEN = os.getenv("DISCORD_TOKEN")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
-openai.api_key = OPENAI_API_KEY
-
-# Intents Discord
 intents = discord.Intents.default()
 intents.messages = True
 intents.message_content = True
+
 client = discord.Client(intents=intents)
 
-# Modèle NLP pour comprendre le sens des phrases
-model = SentenceTransformer("all-MiniLM-L6-v2")
+openai.api_key = os.getenv("OPENAI_API_KEY")
+DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 
-# Intentions prévues + réponses à la Arthur
-intents_list = {
-    "comment rejoindre le serveur": "Pour rejoindre One Last Time, tape F8 puis : connect 88.198.53.38:30075",
-    "adresse du serveur": "Voici l'adresse directe du saloon numérique : connect 88.198.53.38:30075",
-    "où est le serveur": "Faut taper ça dans ta console cow-boy : connect 88.198.53.38:30075",
-    "serveur one last time": "One Last Time, c’est F8 puis : connect 88.198.53.38:30075. N’oublie pas ton chapeau.",
-}
+TARGET_KEYWORDS = ["arthur", "<@"]
 
 @client.event
 async def on_ready():
-    print(f"{client.user} est prêt à dégainer plus vite que son ombre.")
+    print(f"{client.user} est prêt à tirer plus vite que son ombre.")
 
 @client.event
 async def on_message(message):
-    if message.author == client.user:
+    if message.author.bot:
         return
 
-    user_input = message.content.lower()
+    content_lower = message.content.lower()
 
-    # Si le message contient "arthur", le bot se sent concerné
-    if "arthur" in user_input:
-        input_embedding = model.encode(user_input, convert_to_tensor=True)
+    if any(kw in content_lower for kw in TARGET_KEYWORDS):
+        try:
+            prompt = f"""Tu es Arthur Morgan, un cow-boy au ton sec, direct et un peu rustre, mais loyal.
+Tu es sur un serveur Discord de jeu Red Dead Redemption 2 RP qui s'appelle "One Last Time".
+Le fondateur du serveur est un certain "Baguette". Tu peux mentionner que pour rejoindre le serveur, il faut faire : F8 puis taper connect 88.198.53.38:30075.
 
-        best_score = 0
-        best_response = None
+Réponds en rôleplay, en évitant d'être trop poli, et ne répète jamais les questions. Si tu ne comprends pas la phrase de l'utilisateur, tu peux répondre un truc du genre : "Parle plus clairement, cow-boy." ou "Tu veux qu'j'te botte le derrière ou quoi ? Dis-moi c'que tu veux."
 
-        for intent, response in intents_list.items():
-            intent_embedding = model.encode(intent, convert_to_tensor=True)
-            score = util.pytorch_cos_sim(input_embedding, intent_embedding).item()
+Voici la question : {message.content}
+"""
 
-            if score > best_score:
-                best_score = score
-                best_response = response
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7
+            )
+            answer = response.choices[0].message.content
+            await message.channel.send(answer)
 
-        if best_score > 0.6:
-            await message.channel.send(best_response)
-        else:
-            await message.channel.send("Hmm… j’suis pas certain d’comprendre c’que tu veux dire, partenaire.")
+        except Exception as e:
+            await message.channel.send("Hmm... laisse-moi réfléchir...\nJ'ai eu un problème pour répondre, cow-boy.")
+            print(f"Erreur OpenAI : {e}")
+
+client.run(DISCORD_TOKEN)
