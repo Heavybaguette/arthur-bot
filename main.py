@@ -1,55 +1,57 @@
-
 import discord
-import openai
 import os
-import random
+import openai
+import re
+from discord.ext import commands
+from dotenv import load_dotenv
+
+# Chargement des variables d'environnement
+load_dotenv()
+DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+openai.api_key = OPENAI_API_KEY
 
 intents = discord.Intents.default()
+intents.messages = True
 intents.message_content = True
-client = discord.Client(intents=intents)
+bot = commands.Bot(command_prefix="!", intents=intents)
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
-DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-
-cowboy_replies = [
-    "Ouais, j’suis là cow-boy. Parle vite ou dégaine avant que j’me lasse.",
-    "Toujours prêt à dégainer une réponse... qu’est-ce qu’il te faut ?",
-    "J’suis pas un moulin à paroles, mais vas-y, j’t’écoute.",
-    "Ça parle, ça parle... mais est-ce que t’as quelque chose d’important à dire ?",
-    "Hmm... j’me demande si t’es pas en train de gaspiller mon temps.",
-    "Ouais. C’est moi. Arthur. Maintenant, fais court, cow-boy.",
-    "J’ai les bottes dans la boue et les nerfs à vif. T’as intérêt à aller droit au but."
-]
-
-@client.event
+@bot.event
 async def on_ready():
-    print(f"{client.user} est prêt à tirer plus vite que son ombre.")
+    print(f"{bot.user.name} est prêt à tirer plus vite que son ombre.")
 
-@client.event
+@bot.event
 async def on_message(message):
-    if message.author == client.user:
+    if message.author.bot:
         return
 
-    content = message.content.lower()
+    content_lower = message.content.lower()
+    author_name = message.author.display_name
 
-    if "arthur" in content or client.user.mention in message.content:
+    # Déclencheurs souples (nom + intention)
+    trigger_detected = (
+        "arthur" in content_lower or
+        re.search(r"\b@?arthur morgan\b", content_lower)
+    )
+
+    intent_detected = any(keyword in content_lower for keyword in ["t'es là", "tu es là", "t'es dispo", "tu m'entends", "réponds", "?"])
+
+    if trigger_detected and intent_detected:
         try:
-            if "comment on rejoint le serv" in content:
-                await message.channel.send("Tu veux mettre les pieds dans One Last Time, hein ? Tape `F8` et colle ça : `connect 88.198.53.38:30075`. Bienvenue dans l’Ouest, partenaire.")
-                return
-
-            prompt = f"Réponds comme un cow-boy nommé Arthur Morgan dans le style de Red Dead Redemption 2. Sois sec, direct et un peu rustre. Voici ce qu’on t’a dit : {message.content}"
+            prompt = f"Tu es Arthur Morgan, un cow-boy rustre mais loyal. Tu réponds toujours de façon directe, sèche et dans un style western. Voici ce que {author_name} vient de dire : {message.content}"
 
             response = openai.ChatCompletion.create(
                 model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "system", "content": "Tu es Arthur Morgan, un cow-boy rustre et direct, membre de la bande de Dutch dans Red Dead Redemption 2."},
-                    {"role": "user", "content": prompt}
-                ]
+                messages=[{"role": "system", "content": "Tu es Arthur Morgan de Red Dead Redemption 2."},
+                          {"role": "user", "content": prompt}]
             )
 
-            await message.channel.send(response.choices[0].message.content)
+            reply = response.choices[0].message.content
+            await message.channel.send(reply)
 
         except Exception as e:
             print("[ERREUR]", e)
-            await message.channel.send(random.choice(cowboy_replies))
+            await message.channel.send("J'ai eu un problème pour répondre, cow-boy.")
+
+bot.run(DISCORD_TOKEN)
