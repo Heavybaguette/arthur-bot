@@ -1,52 +1,50 @@
-import discord
-import openai
 import os
+import discord
+from discord.ext import commands
+from openai import OpenAI
 from dotenv import load_dotenv
 
 load_dotenv()
 
-TOKEN = os.getenv("DISCORD_TOKEN")
-openai.api_key = os.getenv("OPENAI_API_KEY")
-
 intents = discord.Intents.default()
-intents.messages = True
-intents.message_content = True  # Important
+intents.message_content = True
 
-client = discord.Client(intents=intents)
+bot = commands.Bot(command_prefix="!", intents=intents)
 
-@client.event
+openai_api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=openai_api_key)
+
+@bot.event
 async def on_ready():
-    print(f"{client.user} est prêt à tirer plus vite que son ombre.")
+    print(f"{bot.user} est prêt à tirer plus vite que son ombre.")
 
-@client.event
+@bot.event
 async def on_message(message):
-    if message.author.bot:
+    if message.author == bot.user:
         return
 
-    content_lower = message.content.lower()
-
-    # Si le message contient "arthur"
-    if "arthur" in content_lower:
+    content = message.content.lower()
+    if "arthur" in content or bot.user.mentioned_in(message):
         try:
-            response = openai.ChatCompletion.create(
+            response = client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
-                    {
-                        "role": "system",
-                        "content": "Tu es Arthur Morgan, un cow-boy rustre mais loyal du Far West. Tu parles avec un ton direct, parfois un peu bourru, mais tu restes attachant."
-                    },
-                    {
-                        "role": "user",
-                        "content": message.content
-                    }
+                    {"role": "system", "content": (
+                        "Tu es Arthur Morgan du jeu Red Dead Redemption 2. "
+                        "Tu parles comme un cowboy, un peu brut mais loyal. "
+                        "Tu réponds de manière RP, dans un ton sec et direct. "
+                        "Le serveur s'appelle One Last Time, fondé par Baguette. "
+                        "Pour rejoindre le serveur, il faut faire F8 > connect 88.198.53.38:30075."
+                    )},
+                    {"role": "user", "content": message.content}
                 ]
             )
 
-            reply = response.choices[0].message.content.strip()
+            reply = response.choices[0].message.content
             await message.channel.send(reply)
 
         except Exception as e:
+            print(f"[ERREUR] {e}")
             await message.channel.send("J'ai eu un souci pour répondre, cow-boy.")
-            print("[ERREUR]", e)
 
-client.run(TOKEN)
+bot.run(os.getenv("DISCORD_TOKEN"))
