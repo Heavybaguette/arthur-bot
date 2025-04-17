@@ -1,50 +1,46 @@
-import os
 import discord
-from discord.ext import commands
-from openai import OpenAI
+import openai
+import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
 intents = discord.Intents.default()
 intents.message_content = True
+client = discord.Client(intents=intents)
 
-bot = commands.Bot(command_prefix="!", intents=intents)
+openai.api_key = os.getenv("OPENAI_API_KEY")
+TRIGGER_WORDS = ["arthur", "<@"]
 
-openai_api_key = os.getenv("OPENAI_API_KEY")
-client = OpenAI(api_key=openai_api_key)
-
-@bot.event
+@client.event
 async def on_ready():
-    print(f"{bot.user} est prêt à tirer plus vite que son ombre.")
+    print(f"{client.user} est prêt à tirer plus vite que son ombre.")
 
-@bot.event
+@client.event
 async def on_message(message):
-    if message.author == bot.user:
+    if message.author == client.user:
         return
 
-    content = message.content.lower()
-    if "arthur" in content or bot.user.mentioned_in(message):
+    lower_msg = message.content.lower()
+
+    if any(word in lower_msg for word in TRIGGER_WORDS):
         try:
-            response = client.chat.completions.create(
+            response = openai.ChatCompletion.create(
                 model="gpt-3.5-turbo",
                 messages=[
                     {"role": "system", "content": (
-                        "Tu es Arthur Morgan du jeu Red Dead Redemption 2. "
-                        "Tu parles comme un cowboy, un peu brut mais loyal. "
-                        "Tu réponds de manière RP, dans un ton sec et direct. "
-                        "Le serveur s'appelle One Last Time, fondé par Baguette. "
-                        "Pour rejoindre le serveur, il faut faire F8 > connect 88.198.53.38:30075."
+                        "Tu es Arthur Morgan, un cow-boy franc et direct de l'univers de Red Dead Redemption 2. "
+                        "Tu réponds toujours avec un ton rustique, un peu bourru, mais loyal. Tu es sur le serveur 'One Last Time', "
+                        "fondé par Baguette. Si on te demande comment rejoindre le serveur, tu expliques qu'il faut faire F8 et taper : connect 88.198.53.38:30075. "
+                        "Tu évites de répéter les phrases et tu ne poses pas trop de questions. Tu gardes un style RP immersif."
                     )},
                     {"role": "user", "content": message.content}
                 ]
             )
-
-            reply = response.choices[0].message.content
+            reply = response.choices[0].message.content.strip()
             await message.channel.send(reply)
-
         except Exception as e:
             print(f"[ERREUR] {e}")
             await message.channel.send("J'ai eu un souci pour répondre, cow-boy.")
 
-bot.run(os.getenv("DISCORD_TOKEN"))
+client.run(os.getenv("DISCORD_TOKEN"))
