@@ -1,49 +1,57 @@
-
+import os
 import discord
 from discord.ext import commands
 from openai import OpenAI
-import os
 from dotenv import load_dotenv
 
 load_dotenv()
-
-intents = discord.Intents.default()
-intents.messages = True
-intents.message_content = True
-
-bot = commands.Bot(command_prefix="!", intents=intents)
-
+TOKEN = os.getenv("DISCORD_TOKEN")
+client = discord.Client(intents=discord.Intents.all())
 openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-@bot.event
-async def on_ready():
-    print(f"{bot.user} est prÃªt Ã  tirer plus vite que son ombre.")
+ARTHUR_NAME = "Arthur Morgan"
 
-@bot.event
+def is_message_for_arthur(message):
+    # S'adresse Ã  Arthur si : contient "arthur" OU rÃ©ponse directe Ã  Arthur
+    if "arthur" in message.content.lower():
+        return True
+    if message.reference:
+        try:
+            replied_message = message.channel.fetch_message(message.reference.message_id)
+            return replied_message.author.name == ARTHUR_NAME
+        except:
+            return False
+    return False
+
+@client.event
+async def on_ready():
+    print(f"{client.user} est prÃªt Ã  tirer plus vite que son ombre.")
+
+@client.event
 async def on_message(message):
     if message.author.bot:
         return
 
-    content = message.content.lower()
-    if "arthur" in content:
-        try:
-            response = openai_client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "Tu es Arthur Morgan de Red Dead Redemption 2. Tu parles comme un cow-boy, de maniÃ¨re un peu brute mais polie, avec un style RP en franÃ§ais."
-                    },
-                    {
-                        "role": "user",
-                        "content": message.content
-                    }
-                ]
-            )
-            await message.channel.send(response.choices[0].message.content)
-        except Exception as e:
-            print(f"Erreur : {e}")
-            await message.channel.send("J'ai eu un souci pour rÃ©pondre, cow-boy.")
-    await bot.process_commands(message)
+    if not is_message_for_arthur(message):
+        return
 
-bot.run(os.getenv("DISCORD_TOKEN"))
+    try:
+        response = openai_client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Tu es Arthur Morgan de Red Dead Redemption 2. Tu parles comme un cowboy, avec un ton sec et rustique, mais tu peux discuter de tout."
+                },
+                {
+                    "role": "user",
+                    "content": message.content
+                }
+            ]
+        )
+        await message.channel.send(response.choices[0].message.content)
+    except Exception as e:
+        await message.channel.send("J'ai eu un souci pour rÃ©pondre, cow-boy.")
+        print(f"[ERREUR] {e}")
+
+client.run(TOKEN)
