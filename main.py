@@ -1,27 +1,21 @@
 import discord
+import openai
 import os
-from openai import OpenAI
-from dotenv import load_dotenv
-
-load_dotenv()
-DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 intents = discord.Intents.default()
 intents.messages = True
 intents.message_content = True
 
 client = discord.Client(intents=intents)
-openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
-# Ton de Arthur Morgan
-cowboy_style = (
-    "Tu es Arthur Morgan, un cow-boy rustre et direct de l'Ouest sauvage. "
-    "Tu parles comme un dur à cuire, avec des expressions typiques de cowboy. "
-    "Tu ne mentionnes jamais que tu es une intelligence artificielle, ni que tu viens d'OpenAI. "
-    "Tu réponds comme si tu étais bien réel, en gardant toujours ton caractère de cow-boy RP. "
-    "Tu es sur un serveur nommé One Last Time, fondé par Baguette."
-)
+openai.api_key = os.getenv("OPENAI_API_KEY")
+BOT_PREFIX = "Arthur"  # Se déclenche uniquement si le message commence par "Arthur"
+
+style_rp = """
+Tu es Arthur Morgan, un cow-boy rustique, direct et charismatique. Tu parles avec le ton d’un homme du Far West de 1900. 
+Tu es loyal, terre-à-terre, parfois sec, parfois sage. Tu ne réponds jamais comme une IA ou un robot.
+Tu ne dis jamais que tu es une IA. Reste toujours dans ton personnage.
+"""
 
 @client.event
 async def on_ready():
@@ -29,27 +23,26 @@ async def on_ready():
 
 @client.event
 async def on_message(message):
-    if message.author == client.user:
+    if message.author.bot:
         return
 
-    # Toujours détecter si le message contient "Arthur" ou est une réponse à Arthur
-    if "arthur" in message.content.lower() or message.reference:
+    if message.content.startswith(BOT_PREFIX):
+        prompt = message.content[len(BOT_PREFIX):].strip()
+        await message.channel.send("Hmm… laisse-moi réfléchir…")
+
         try:
-            full_prompt = f"{cowboy_style}\n\n{message.author.display_name} : {message.content}\nArthur Morgan :"
-            completion = openai_client.chat.completions.create(
-                model="gpt-4",
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
                 messages=[
-                    {"role": "system", "content": cowboy_style},
-                    {"role": "user", "content": message.content}
+                    {"role": "system", "content": style_rp},
+                    {"role": "user", "content": prompt}
                 ],
-                temperature=0.8,
-                max_tokens=200,
+                max_tokens=150,
+                temperature=0.8
             )
-            response = completion.choices[0].message.content
-            await message.channel.send(response)
-
+            reply = response["choices"][0]["message"]["content"]
+            await message.channel.send(reply)
         except Exception as e:
-            await message.channel.send("J'ai eu un souci pour répondre, cow-boy.")
-            print(f"Erreur : {e}")
+            await message.channel.send("J'ai eu un problème pour répondre, cow-boy.")
 
-client.run(DISCORD_TOKEN)
+client.run(os.getenv("DISCORD_TOKEN"))
